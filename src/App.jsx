@@ -37,7 +37,6 @@ import ColorPicker from './components/ColorPicker';
 import Gallery from './components/Gallery';
 import { useChartStore } from './store/chartStore';
 
-// Define a set of nice colors for nodes
 const NODE_COLORS = [
   '#4a86e8', // Blue
   '#0f9d58', // Green

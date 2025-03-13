@@ -1,4 +1,3 @@
-// components/ChartCanvas.jsx
 import React, { useRef, useState, useEffect } from 'react';
 import { styled } from '@mui/material/styles';
 import Paper from '@mui/material/Paper';
