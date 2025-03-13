@@ -180,16 +180,6 @@ const Gallery = () => {
   const generateSVG = (chartData) => {
     const { title, nodes, connections } = chartData;
 
-    const getTextPosition = (node, index, total) => {
-      const lineHeight = node.fontSize * 1.2;
-      const totalHeight = lineHeight * total;
-      const startY = node.y - totalHeight / 2 + lineHeight / 2;
-      return {
-        x: node.x,
-        y: startY + index * lineHeight,
-      };
-    };
-
     return `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
         <rect width="100%" height="100%" fill="#f8f9fa" rx="10" ry="10" />
@@ -239,36 +229,75 @@ const Gallery = () => {
               opacity="${node.opacity}"
             />
             
-            ${node.lines
-              .map((line, i) => {
-                const pos = getTextPosition(node, i, node.lines.length);
-                return `
-                <text
-                  x="${pos.x}"
-                  y="${pos.y}"
-                  font-family="Arial, sans-serif"
-                  font-size="${node.fontSize}"
-                  font-weight="${node.fontWeight}"
-                  text-anchor="middle"
-                  dominant-baseline="middle"
-                  fill="white"
-                >
-                  ${line}
-                </text>
-              `;
-              })
-              .join('')}
+            ${
+              node.title
+                ? `
+              <text
+                x="${node.x}"
+                y="${node.y - (node.lines.length > 0 ? node.radius / 3 : 0)}"
+                font-family="Arial, sans-serif"
+                font-size="${(node.fontSize || 14) + 2}"
+                font-weight="bold"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                fill="white"
+              >
+                ${node.title}
+              </text>
+            `
+                : ''
+            }
+            
+            ${
+              node.lines
+                ? node.lines
+                    .map(
+                      (line, i) => `
+              <text
+                x="${node.x}"
+                y="${
+                  node.y +
+                  (node.title ? node.radius / 6 : 0) +
+                  i * (node.fontSize || 14) * 1.2
+                }"
+                font-family="Arial, sans-serif"
+                font-size="${node.fontSize || 14}"
+                font-weight="${node.fontWeight || 'normal'}"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                fill="white"
+              >
+                ${line}
+              </text>
+            `
+                    )
+                    .join('')
+                : ''
+            }
             
             ${
               node.image
                 ? `
               <image
                 href="${node.image}"
-                x="${node.x - node.radius / 2}"
-                y="${node.y + node.radius / 2}"
-                width="${node.radius}"
-                height="${node.radius}"
+                x="${
+                  node.x +
+                  (node.imageX || 0) -
+                  (node.radius * (node.imageSize || 1)) / 2
+                }"
+                y="${
+                  node.y +
+                  (node.imageY || 0) -
+                  (node.radius * (node.imageSize || 1)) / 2
+                }"
+                width="${node.radius * (node.imageSize || 1)}"
+                height="${node.radius * (node.imageSize || 1)}"
                 preserveAspectRatio="xMidYMid meet"
+                style="transform: rotate(${
+                  node.imageRotation || 0
+                }deg); transform-origin: ${node.x + (node.imageX || 0)}px ${
+                    node.y + (node.imageY || 0)
+                  }px"
               />
             `
                 : ''

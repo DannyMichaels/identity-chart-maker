@@ -74,14 +74,14 @@ const ChartCanvas = () => {
   // For keyboard events (Delete)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Delete' && selectedNodes?.length > 0) {
+      if (e.key === 'Delete' && selectedNodes.length > 0) {
         removeMultipleNodes(selectedNodes);
       } else if (e.key === 'Escape') {
         // Cancel connecting mode or selection
         if (connecting) {
           setConnecting(false);
           setConnectionStart(null);
-        } else if (selectedNodes?.length > 0) {
+        } else if (selectedNodes.length > 0) {
           clearNodeSelection();
         }
       } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
@@ -358,6 +358,15 @@ const ChartCanvas = () => {
 
   // Calculate text positioning
   const getTextPosition = (node, index, total) => {
+    // If this is the title line (index === -1), position at top
+    if (index === -1) {
+      return {
+        x: node.x,
+        y: node.y - node.radius / 2, // Position title at the top part of the node
+      };
+    }
+
+    // For regular content lines
     const lineHeight = node.fontSize * 1.2;
     const totalHeight = lineHeight * total;
     const startY = node.y - totalHeight / 2 + lineHeight / 2;
@@ -452,7 +461,7 @@ const ChartCanvas = () => {
         )}
 
         {/* Selection UI information */}
-        {selectedNodes?.length > 1 && (
+        {selectedNodes.length > 1 && (
           <text
             x="50%"
             y="60"
@@ -461,7 +470,7 @@ const ChartCanvas = () => {
             fontFamily="Arial, sans-serif"
             fontSize="14"
             fill="#4a86e8">
-            {selectedNodes?.length} nodes selected - Press Delete to remove all
+            {selectedNodes.length} nodes selected - Press Delete to remove all
             selected nodes
           </text>
         )}
@@ -483,12 +492,32 @@ const ChartCanvas = () => {
               onContextMenu={(e) => handleContextMenu(e, node.id)}
             />
 
-            {/* Node Text */}
+            {/* Node Title (if present) */}
+            {node.title && (
+              <text
+                x={node.x}
+                y={node.y - (node.lines.length > 0 ? node.radius / 3 : 0)}
+                fontFamily="Arial, sans-serif"
+                fontSize={node.fontSize + 2} // Make title slightly larger
+                fontWeight="bold" // Always bold the title
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fill="white"
+                pointerEvents="none">
+                {node.title}
+              </text>
+            )}
+
+            {/* Node Text Lines */}
             {node.lines.map((line, i) => (
               <text
                 key={`${node.id}-line-${i}`}
-                x={getTextPosition(node, i, node.lines.length).x}
-                y={getTextPosition(node, i, node.lines.length).y}
+                x={node.x}
+                y={
+                  node.y +
+                  (node.title ? node.radius / 6 : 0) +
+                  i * node.fontSize * 1.2
+                }
                 fontFamily="Arial, sans-serif"
                 fontSize={node.fontSize}
                 fontWeight={node.fontWeight}
@@ -504,11 +533,26 @@ const ChartCanvas = () => {
             {node.image && (
               <image
                 href={node.image}
-                x={node.x - node.radius / 2}
-                y={node.y + node.radius / 2}
-                width={node.radius}
-                height={node.radius}
+                x={
+                  node.x +
+                  (node.imageX || 0) -
+                  (node.radius * (node.imageSize || 1)) / 2
+                }
+                y={
+                  node.y +
+                  (node.imageY || 0) -
+                  (node.radius * (node.imageSize || 1)) / 2
+                }
+                width={node.radius * (node.imageSize || 1)}
+                height={node.radius * (node.imageSize || 1)}
                 preserveAspectRatio="xMidYMid meet"
+                style={{
+                  transform: `rotate(${node.imageRotation || 0}deg)`,
+                  transformOrigin: `${node.x + (node.imageX || 0)}px ${
+                    node.y + (node.imageY || 0)
+                  }px`,
+                }}
+                pointerEvents="none"
               />
             )}
           </g>
