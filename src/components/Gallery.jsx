@@ -114,85 +114,42 @@ const Gallery = () => {
   };
 
   const downloadChart = (chartData) => {
-    // Create SVG data
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = generateSVG(chartData);
-    const svg = tempDiv.querySelector('svg');
+    try {
+      const { title, nodes, connections } = chartData;
 
-    // Create a canvas element
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
+      // Create a div to hold the SVG temporarily
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'absolute';
+      tempDiv.style.visibility = 'hidden';
+      tempDiv.style.width = '800px';
+      tempDiv.style.height = '600px';
+      document.body.appendChild(tempDiv);
 
-    // Set canvas size with higher resolution
-    const width = 800;
-    const height = 600;
-    const scale = 2; // Higher resolution
-    canvas.width = width * scale;
-    canvas.height = height * scale;
+      // Calculate dimensions
+      let minX = Infinity,
+        minY = Infinity,
+        maxX = -Infinity,
+        maxY = -Infinity;
 
-    // Convert SVG to a data URL
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], {
-      type: 'image/svg+xml;charset=utf-8',
-    });
-    const DOMURL = window.URL || window.webkitURL || window;
-    const svgUrl = DOMURL.createObjectURL(svgBlob);
+      nodes.forEach((node) => {
+        minX = Math.min(minX, node.x - node.radius * 1.5);
+        minY = Math.min(minY, node.y - node.radius * 1.5);
+        maxX = Math.max(maxX, node.x + node.radius * 1.5);
+        maxY = Math.max(maxY, node.y + node.radius * 1.5);
+      });
 
-    // Create an image from the SVG
-    const img = new Image();
-    img.onload = function () {
-      // Draw the image on the canvas with background
-      ctx.fillStyle = '#f8f9fa';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(scale, scale); // Scale for higher resolution
-      ctx.drawImage(img, 0, 0, width, height);
-      DOMURL.revokeObjectURL(svgUrl);
+      // Ensure minimum size with padding
+      const width = Math.max(800, maxX - minX + 100);
+      const height = Math.max(600, maxY - minY + 100);
 
-      // Convert canvas to PNG
-      try {
-        const pngUrl = canvas.toDataURL('image/png');
-
-        const downloadLink = document.createElement('a');
-        downloadLink.href = pngUrl;
-        downloadLink.download = `${
-          chartData.title || 'identity-chart'
-        }-${Date.now()}.png`;
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
-      } catch (err) {
-        console.error('Error creating PNG:', err);
-        alert('There was an error creating the PNG. Please try again.');
-      }
-    };
-
-    img.onerror = function () {
-      console.error('Error loading SVG');
-      DOMURL.revokeObjectURL(svgUrl);
-      alert('There was an error generating the image. Please try again.');
-    };
-
-    img.src = svgUrl;
-  };
-
-  // Function to generate SVG preview for each chart
-  const generateSVG = (chartData) => {
-    const { title, nodes, connections } = chartData;
-
-    return `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
-        <rect width="100%" height="100%" fill="#f8f9fa" rx="10" ry="10" />
+      // Create SVG (using simpler format with fewer attributes)
+      tempDiv.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
+        <rect width="${width}" height="${height}" fill="#f8f9fa" />
         
-        <text 
-          x="50%" 
-          y="30" 
-          dominant-baseline="middle" 
-          text-anchor="middle" 
-          font-family="Arial, sans-serif" 
-          font-size="24" 
-          font-weight="bold" 
-          fill="#333"
-        >
+        <text x="${
+          width / 2
+        }" y="30" text-anchor="middle" font-family="Arial" font-size="24" font-weight="bold" fill="black">
           ${title || 'Identity Chart'}
         </text>
         
@@ -200,113 +157,258 @@ const Gallery = () => {
           .map((conn) => {
             const source = nodes.find((n) => n.id === conn.source);
             const target = nodes.find((n) => n.id === conn.target);
-
             if (!source || !target) return '';
-
-            return `
-            <line
-              x1="${source.x}"
-              y1="${source.y}"
-              x2="${target.x}"
-              y2="${target.y}"
-              stroke="#666"
-              stroke-width="2"
-            />
-          `;
+            return `<line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}" stroke="#666" stroke-width="2" />`;
           })
           .join('')}
         
         ${nodes
           .map(
             (node) => `
-          <g>
-            <circle
-              cx="${node.x}"
-              cy="${node.y}"
-              r="${node.radius}"
-              fill="${node.color}"
-              opacity="${node.opacity}"
-            />
-            
-            ${
+          <circle cx="${node.x}" cy="${node.y}" r="${node.radius}" fill="${
+              node.color
+            }" opacity="${node.opacity}" />
+          
+          ${
+            node.title
+              ? `<text x="${node.x}" y="${
+                  node.y - node.radius / 3
+                }" font-family="Arial" font-size="${node.fontSize + 2}" 
+            font-weight="bold" text-anchor="middle" fill="white">${
               node.title
-                ? `
-              <text
-                x="${node.x}"
-                y="${node.y - (node.lines.length > 0 ? node.radius / 3 : 0)}"
-                font-family="Arial, sans-serif"
-                font-size="${(node.fontSize || 14) + 2}"
-                font-weight="bold"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                fill="white"
-              >
-                ${node.title}
-              </text>
-            `
-                : ''
-            }
-            
-            ${
-              node.lines
-                ? node.lines
-                    .map(
-                      (line, i) => `
-              <text
-                x="${node.x}"
-                y="${
-                  node.y +
-                  (node.title ? node.radius / 6 : 0) +
-                  i * (node.fontSize || 14) * 1.2
-                }"
-                font-family="Arial, sans-serif"
-                font-size="${node.fontSize || 14}"
-                font-weight="${node.fontWeight || 'normal'}"
-                text-anchor="middle"
-                dominant-baseline="middle"
-                fill="white"
-              >
-                ${line}
-              </text>
-            `
-                    )
-                    .join('')
-                : ''
-            }
-            
-            ${
-              node.image
-                ? `
-              <image
-                href="${node.image}"
-                x="${
-                  node.x +
-                  (node.imageX || 0) -
-                  (node.radius * (node.imageSize || 1)) / 2
-                }"
-                y="${
-                  node.y +
-                  (node.imageY || 0) -
-                  (node.radius * (node.imageSize || 1)) / 2
-                }"
-                width="${node.radius * (node.imageSize || 1)}"
-                height="${node.radius * (node.imageSize || 1)}"
-                preserveAspectRatio="xMidYMid meet"
-                style="transform: rotate(${
-                  node.imageRotation || 0
-                }deg); transform-origin: ${node.x + (node.imageX || 0)}px ${
-                    node.y + (node.imageY || 0)
-                  }px"
-              />
-            `
-                : ''
-            }
-          </g>
+            }</text>`
+              : ''
+          }
+          
+          ${
+            node.lines
+              ? node.lines
+                  .map(
+                    (line, i) =>
+                      `<text x="${node.x}" y="${
+                        node.y +
+                        (node.title ? node.radius / 6 : 0) +
+                        i * node.fontSize * 1.2
+                      }" 
+            font-family="Arial" font-size="${node.fontSize}" font-weight="${
+                        node.fontWeight
+                      }" 
+            text-anchor="middle" fill="white">${line}</text>`
+                  )
+                  .join('')
+              : ''
+          }
         `
           )
           .join('')}
       </svg>
     `;
+
+      // Get the SVG element we just created
+      const svg = tempDiv.querySelector('svg');
+
+      // Use html2canvas as a more reliable method for SVG to canvas conversion
+      // Create a canvas
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      // Set canvas dimensions with higher resolution
+      const scale = 2;
+      canvas.width = width * scale;
+      canvas.height = height * scale;
+
+      // Add white background
+      ctx.fillStyle = '#f8f9fa';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Convert SVG to data URL (the safer method)
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const svgDataUrl =
+        'data:image/svg+xml;base64,' +
+        btoa(unescape(encodeURIComponent(svgData)));
+
+      // Create image
+      const img = new Image();
+
+      img.onload = function () {
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to PNG
+        try {
+          // Create PNG and download
+          const pngUrl = canvas.toDataURL('image/png');
+
+          const downloadLink = document.createElement('a');
+          downloadLink.href = pngUrl;
+          downloadLink.download = `${
+            title || 'identity-chart'
+          }-${Date.now()}.png`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+
+          // Clean up
+          document.body.removeChild(tempDiv);
+        } catch (err) {
+          console.error('PNG conversion error:', err);
+          downloadSvgDirectly(svgData, title);
+        }
+      };
+
+      img.onerror = function (err) {
+        console.error('SVG image loading error:', err);
+        document.body.removeChild(tempDiv);
+        downloadSvgDirectly(svgData, title);
+      };
+
+      // Start the conversion process
+      img.src = svgDataUrl;
+    } catch (error) {
+      console.error('Download process error:', error);
+      alert('Error during download preparation. Trying fallback method...');
+
+      // Try a direct SVG download as last resort
+      if (chartData && chartData.title) {
+        const svgContent = generateSVG(chartData);
+        downloadSvgDirectly(svgContent, chartData.title);
+      }
+    }
+  };
+
+  // Fallback function to download direct SVG
+  const downloadSvgDirectly = (svgContent, title) => {
+    try {
+      const svgBlob = new Blob([svgContent], {
+        type: 'image/svg+xml;charset=utf-8',
+      });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      const downloadLink = document.createElement('a');
+      downloadLink.href = svgUrl;
+      downloadLink.download = `${title || 'identity-chart'}-${Date.now()}.svg`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      URL.revokeObjectURL(svgUrl);
+    } catch (error) {
+      console.error('SVG download failed:', error);
+      alert('All download attempts failed. Please try again later.');
+    }
+  };
+
+  // Function to generate SVG preview for each chart
+  // Fixed SVG generator for gallery previews
+  const generateSVG = (chartData) => {
+    const { title, nodes, connections } = chartData;
+
+    // For previews, we use a fixed aspect ratio
+    const width = 800;
+    const height = 600;
+
+    return `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="100%" height="100%">
+      <rect width="100%" height="100%" fill="#f8f9fa" rx="10" ry="10" />
+      
+      <text 
+        x="50%" 
+        y="30" 
+        dominant-baseline="middle" 
+        text-anchor="middle" 
+        font-family="Arial, sans-serif" 
+        font-size="24" 
+        font-weight="bold" 
+        fill="#333"
+      >
+        ${title || 'Identity Chart'}
+      </text>
+      
+      ${connections
+        .map((conn) => {
+          const source = nodes.find((n) => n.id === conn.source);
+          const target = nodes.find((n) => n.id === conn.target);
+
+          if (!source || !target) return '';
+
+          return `
+          <line
+            x1="${source.x}"
+            y1="${source.y}"
+            x2="${target.x}"
+            y2="${target.y}"
+            stroke="#666"
+            stroke-width="2"
+          />
+        `;
+        })
+        .join('')}
+      
+      ${nodes
+        .map(
+          (node) => `
+        <g>
+          <circle
+            cx="${node.x}"
+            cy="${node.y}"
+            r="${node.radius}"
+            fill="${node.color}"
+            opacity="${node.opacity}"
+          />
+          
+          ${
+            node.title
+              ? `
+            <text
+              x="${node.x}"
+              y="${
+                node.y -
+                (node.lines && node.lines.length > 0 ? node.radius / 3 : 0)
+              }"
+              font-family="Arial, sans-serif"
+              font-size="${(node.fontSize || 14) + 2}"
+              font-weight="bold"
+              text-anchor="middle"
+              dominant-baseline="middle"
+              fill="white"
+            >
+              ${node.title}
+            </text>
+          `
+              : ''
+          }
+          
+          ${
+            node.lines
+              ? node.lines
+                  .map(
+                    (line, i) => `
+            <text
+              x="${node.x}"
+              y="${
+                node.y +
+                (node.title ? node.radius / 6 : 0) +
+                i * (node.fontSize || 14) * 1.2
+              }"
+              font-family="Arial, sans-serif"
+              font-size="${node.fontSize || 14}"
+              font-weight="${node.fontWeight || 'normal'}"
+              text-anchor="middle"
+              dominant-baseline="middle"
+              fill="white"
+            >
+              ${line}
+            </text>
+          `
+                  )
+                  .join('')
+              : ''
+          }
+        </g>
+      `
+        )
+        .join('')}
+    </svg>
+  `;
   };
 
   if (savedCharts.length === 0) {

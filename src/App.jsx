@@ -161,6 +161,8 @@ const App = () => {
     addNode,
     currentTab,
     setCurrentTab,
+    nodes,
+    connections,
   } = useChartStore();
 
   const handleTabChange = (event, newValue) => {
@@ -173,45 +175,74 @@ const App = () => {
       return;
     }
 
-    // Get the SVG element
+    // Get the current SVG element for reference
     const svg = canvasRef.current.querySelector('svg');
     if (!svg) {
       showNotification('Error: Could not find SVG element', 'error');
       return;
     }
 
+    // Calculate the actual bounds needed for all nodes
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+
+    // Loop through all nodes to find the boundaries
+    nodes.forEach((node) => {
+      // Consider node radius when calculating boundaries
+      minX = Math.min(minX, node.x - node.radius * 1.5);
+      minY = Math.min(minY, node.y - node.radius * 1.5);
+      maxX = Math.max(maxX, node.x + node.radius * 1.5);
+      maxY = Math.max(maxY, node.y + node.radius * 1.5);
+    });
+
+    // Add padding and ensure minimum size
+    const width = Math.max(800, maxX - minX + 100);
+    const height = Math.max(600, maxY - minY + 100);
+
+    // Use a simpler approach by using the actual SVG on the page
+    // We'll clone it and adjust its dimensions
+    const clonedSvg = svg.cloneNode(true);
+    clonedSvg.setAttribute('width', width);
+    clonedSvg.setAttribute('height', height);
+    clonedSvg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+    // Ensure the title is properly positioned
+    const titleElement = clonedSvg.querySelector('text');
+    if (titleElement) {
+      titleElement.setAttribute('x', width / 2);
+      titleElement.setAttribute('y', 30);
+    }
+
     // Create a canvas element
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
-    // Set the canvas size to match the SVG
-    const svgRect = svg.getBoundingClientRect();
-    canvas.width = svgRect.width * 2; // Higher resolution
-    canvas.height = svgRect.height * 2;
+    // Set canvas size with high resolution
+    const scale = 2;
+    canvas.width = width * scale;
+    canvas.height = height * scale;
 
-    // Convert SVG to a data URL
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const svgBlob = new Blob([svgData], {
-      type: 'image/svg+xml;charset=utf-8',
-    });
-    const DOMURL = window.URL || window.webkitURL || window;
-    const svgUrl = DOMURL.createObjectURL(svgBlob);
-
-    // Create an image from the SVG
+    // Create an img element
     const img = new Image();
-    img.onload = function () {
-      // Draw the image on the canvas
-      ctx.fillStyle = '#f8f9fa'; // Background color
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.scale(2, 2); // Scale for higher resolution
-      ctx.drawImage(img, 0, 0);
-      DOMURL.revokeObjectURL(svgUrl);
 
-      // Convert canvas to PNG
+    // Convert the SVG to a data URL
+    const svgData = new XMLSerializer().serializeToString(clonedSvg);
+    const encodedSvg = encodeURIComponent(svgData);
+    const dataUrl = `data:image/svg+xml;charset=utf-8,${encodedSvg}`;
+
+    img.onload = function () {
+      // Draw the image onto the canvas
+      ctx.fillStyle = '#f8f9fa';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(scale, scale);
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to PNG and download
       try {
         const pngUrl = canvas.toDataURL('image/png');
 
-        // Create download link
         const downloadLink = document.createElement('a');
         downloadLink.href = pngUrl;
         downloadLink.download = `${
@@ -228,15 +259,13 @@ const App = () => {
       }
     };
 
-    img.onerror = function () {
-      console.error('Error loading SVG');
-      DOMURL.revokeObjectURL(svgUrl);
+    img.onerror = function (e) {
+      console.error('Error loading SVG', e);
       showNotification('Error generating image. Please try again.', 'error');
     };
 
-    img.src = svgUrl;
+    img.src = dataUrl;
   };
-
   const saveToGallery = () => {
     if (!currentChart.title) {
       updateChart({ ...currentChart, title: 'My Identity Chart' });
